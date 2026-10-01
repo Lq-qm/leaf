@@ -84,25 +84,31 @@ section() {
     echo -e "${YELLOW}==> $1${NC}"
 }
 
+# Mostra uma linha de progresso para operações demoradas
+progress() {
+    echo -e "  ${YELLOW}... $1...${NC}"
+}
+
 # Remove um diretório, reportando e somando o espaço liberado
 remove_dir() {
     local dir="$1" name="$2"
     if [[ -d "$dir" ]]; then
-        local size bytes
-        size=$(du -sh "$dir" 2>/dev/null | cut -f1)
+        local bytes
+        progress "limpando ${name}"
         bytes=$(du -sb "$dir" 2>/dev/null | cut -f1)
         rm -rf "${dir:?}"
         add_freed "$bytes"
-        echo -e "  ${GREEN}✓${NC} $name (${size:-?})"
+        echo -e "  ${GREEN}✓${NC} ${name} ($(human_bytes "${bytes:-0}"))"
     else
-        echo -e "  ${RED}✗${NC} $name (diretório não encontrado)"
+        echo -e "  ${RED}✗${NC} ${name} (diretório não encontrado)"
     fi
 }
 
 # ===== uv =====
 section "uv"
 if command -v uv >/dev/null 2>&1; then
-    uv cache clean >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do uv limpo"
+    progress "limpando cache do uv"
+    uv cache clean && echo -e "  ${GREEN}✓${NC} cache do uv limpo"
 else
     echo -e "  ${YELLOW}- uv não instalado, pulando${NC}"
 fi
@@ -110,11 +116,14 @@ fi
 # ===== pip =====
 section "pip"
 if command -v pip3 >/dev/null 2>&1; then
-    pip3 cache purge >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
+    progress "limpando cache do pip"
+    pip3 cache purge && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
 elif command -v pip >/dev/null 2>&1; then
-    pip cache purge >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
+    progress "limpando cache do pip"
+    pip cache purge && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
 elif command -v python3 >/dev/null 2>&1; then
-    python3 -m pip cache purge >/dev/null 2>&1 \
+    progress "limpando cache do pip"
+    python3 -m pip cache purge \
         && echo -e "  ${GREEN}✓${NC} cache do pip limpo" \
         || echo -e "  ${RED}✗ não consegui limpar cache do pip${NC}"
 else
@@ -126,10 +135,19 @@ section "pacman"
 if command -v pacman >/dev/null 2>&1; then
     local_orphans=$(pacman -Qtdq 2>/dev/null)
     if [[ -n "$local_orphans" ]]; then
-        sudo pacman -Rns $local_orphans >/dev/null 2>&1 \
-            && echo -e "  ${GREEN}✓${NC} pacotes órfãos removidos"
+        progress "removendo pacotes órfãos (pode pedir a senha do sudo)"
+        if sudo pacman -Rns $local_orphans; then
+            echo -e "  ${GREEN}✓${NC} pacotes órfãos removidos"
+        else
+            echo -e "  ${RED}✗ falha ao remover pacotes órfãos${NC}"
+        fi
     fi
-    sudo pacman -Sc >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do pacman limpo"
+    progress "esvaziando cache do pacman (pode demorar)"
+    if sudo pacman -Sc; then
+        echo -e "  ${GREEN}✓${NC} cache do pacman limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar cache do pacman${NC}"
+    fi
 else
     echo -e "  ${YELLOW}- pacman não encontrado, pulando${NC}"
 fi
@@ -137,7 +155,12 @@ fi
 # ===== yay =====
 section "yay"
 if command -v yay >/dev/null 2>&1; then
-    yay -Sc >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do yay limpo"
+    progress "limpando cache do yay"
+    if yay -Sc; then
+        echo -e "  ${GREEN}✓${NC} cache do yay limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar cache do yay${NC}"
+    fi
     echo "  (dica: rode 'yay -scc' para remover também órfãos AUR)"
 else
     echo -e "  ${YELLOW}- yay não encontrado, pulando${NC}"
@@ -190,6 +213,7 @@ if command -v journalctl >/dev/null 2>&1; then
         b=$(du -sb "$jdir" 2>/dev/null | cut -f1)
         [[ "$b" =~ ^[0-9]+$ ]] && before=$((before + b))
     done
+    progress "compactando journal (mantendo os últimos 7 dias)"
     sudo journalctl --vacuum-time=7d >/dev/null 2>&1
     after=0
     for jdir in /var/log/journal /run/log/journal; do
@@ -207,6 +231,7 @@ fi
 # Arquivos temporários (antigos de mais de 1 dia)
 for tdir in /tmp /var/tmp; do
     [[ -d "$tdir" ]] || continue
+    progress "limpando arquivos antigos de $tdir (mais de 1 dia)"
     bytes=$(sudo find "$tdir" -mindepth 1 -mtime +1 -exec du -cb {} + 2>/dev/null | tail -1 | awk '{print $1}')
     [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
     sudo find "$tdir" -mindepth 1 -mtime +1 -delete 2>/dev/null
@@ -225,11 +250,11 @@ if [[ -d "$trash" ]]; then
         case "$ans" in [Nn]*) confirm=false ;; *) confirm=true ;; esac
     fi
     if $confirm; then
-        size=$(du -sh "$trash" 2>/dev/null | cut -f1)
+        progress "esvaziando lixeira"
         bytes=$(du -sb "$trash" 2>/dev/null | cut -f1)
         rm -rf "${trash:?}/files"/* "${trash:?}/info"/* 2>/dev/null
         add_freed "$bytes"
-        echo -e "  ${GREEN}✓${NC} lixeira esvaziada (${size:-?})"
+        echo -e "  ${GREEN}✓${NC} lixeira esvaziada ($(human_bytes "${bytes:-0}"))"
     else
         echo -e "  ${YELLOW}- lixeira mantida (use -y para pular confirmação)${NC}"
     fi
@@ -243,21 +268,24 @@ remove_dir "$HOME/.cache/thumbnails" "miniaturas (~/.cache/thumbnails)"
 
 # Cache do usuário (apps regeneram o que precisarem)
 if [[ -d "$HOME/.cache" ]]; then
-    size=$(du -sh "$HOME/.cache" 2>/dev/null | cut -f1)
+    progress "limpando ~/.cache (pode demorar)"
     bytes=$(du -sb "$HOME/.cache" 2>/dev/null | cut -f1)
     rm -rf "${HOME:?}/.cache"/* 2>/dev/null
     rm -rf "${HOME:?}/.cache"/.[!.]* 2>/dev/null
     add_freed "$bytes"
-    echo -e "  ${GREEN}✓${NC} ~/.cache limpo (${size:-?})"
+    echo -e "  ${GREEN}✓${NC} ~/.cache limpo ($(human_bytes "${bytes:-0}"))"
 else
     echo -e "  ${YELLOW}- ~/.cache inexistente${NC}"
 fi
 
 # Flatpak (runtimes não utilizados)
 if command -v flatpak >/dev/null 2>&1; then
-    flatpak uninstall --unused -y >/dev/null 2>&1 \
-        && echo -e "  ${GREEN}✓${NC} runtimes flatpak não utilizados removidos" \
-        || echo -e "  ${YELLOW}- sem flatpak para limpar${NC}"
+    progress "removendo runtimes flatpak não utilizados"
+    if flatpak uninstall --unused -y; then
+        echo -e "  ${GREEN}✓${NC} runtimes flatpak não utilizados removidos"
+    else
+        echo -e "  ${YELLOW}- nada a remover no flatpak${NC}"
+    fi
 else
     echo -e "  ${YELLOW}- flatpak não instalado, pulando${NC}"
 fi
