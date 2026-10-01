@@ -1,0 +1,276 @@
+#!/usr/bin/env bash
+#
+# leaf — Limpeza simples do sistema (Arch/Manjaro)
+#
+# Limpa: uv, pip, pacman, yay, caches de navegadores (Brave, Firefox,
+# Chrome) e arquivos seguros de limpar (journal, temporários, lixeira,
+# miniaturas, ~/.cache, flatpak).
+#
+# Ao final, exibe a SOMA de espaço total liberado.
+#
+# Uso:
+#   ./leaf [-y]
+#     -y, --yes   não pede confirmação para esvaziar a lixeira
+#
+# Personalização (variáveis de ambiente):
+#   LEAF_ART       arte ASCII exibida no cabeçalho
+#   LEAF_TITLE     título do cabeçalho
+#   LEAF_SUBTITLE  subtítulo do cabeçalho
+#
+# Exemplo:
+#   LEAF_TITLE="meu limpa" LEAF_SUBTITLE="feito por mim" ./leaf
+#
+set -u
+
+# ===== Flags =====
+ASSUM_YES=false
+for arg in "$@"; do
+    case "$arg" in
+        -y|--yes) ASSUM_YES=true ;;
+    esac
+done
+
+# ===== Cores (desligadas se não for terminal) =====
+if [[ -t 1 ]]; then
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[1;33m'
+    CYAN=$'\033[0;36m'
+    BOLD=$'\033[1m'
+    NC=$'\033[0m'
+else
+    RED='' GREEN='' YELLOW='' CYAN='' BOLD='' NC=''
+fi
+
+# ===== Cabeçalho (personalizável) =====
+
+print_banner() {
+    local art="${LEAF_ART:-}"
+    local title="${LEAF_TITLE:-leaf — limpeza do sistema}"
+    local subtitle="${LEAF_SUBTITLE:-caches • pacotes • navegadores • temporários}"
+
+    echo
+    while IFS= read -r line; do
+        echo -e "${GREEN}${line}${NC}"
+    done <<< "$art"
+    echo
+    echo -e "  ${BOLD}${CYAN}${title}${NC}"
+    echo -e "  ${subtitle}"
+    echo -e "  ${YELLOW}---------------------------------------------------${NC}"
+    echo
+}
+print_banner
+
+# ===== Contador de espaço liberado =====
+TOTAL_BYTES=0
+
+add_freed() {
+    local b="${1:-}"
+    [[ "$b" =~ ^[0-9]+$ ]] && TOTAL_BYTES=$((TOTAL_BYTES + b))
+}
+
+# Converte bytes para formato legível
+human_bytes() {
+    local b="${1:-0}"
+    if   (( b >= 1073741824 )); then awk "BEGIN{printf \"%.2f GiB\", $b/1073741824}"
+    elif (( b >= 1048576 ));   then awk "BEGIN{printf \"%.2f MiB\", $b/1048576}"
+    elif (( b >= 1024 ));      then awk "BEGIN{printf \"%.1f KiB\", $b/1024}"
+    else printf '%s B' "$b"; fi
+}
+
+# ===== Utilitários =====
+section() {
+    echo
+    echo -e "${YELLOW}==> $1${NC}"
+}
+
+# Remove um diretório, reportando e somando o espaço liberado
+remove_dir() {
+    local dir="$1" name="$2"
+    if [[ -d "$dir" ]]; then
+        local size bytes
+        size=$(du -sh "$dir" 2>/dev/null | cut -f1)
+        bytes=$(du -sb "$dir" 2>/dev/null | cut -f1)
+        rm -rf "${dir:?}"
+        add_freed "$bytes"
+        echo -e "  ${GREEN}✓${NC} $name (${size:-?})"
+    else
+        echo -e "  ${RED}✗${NC} $name (diretório não encontrado)"
+    fi
+}
+
+# ===== uv =====
+section "uv"
+if command -v uv >/dev/null 2>&1; then
+    uv cache clean >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do uv limpo"
+else
+    echo -e "  ${YELLOW}- uv não instalado, pulando${NC}"
+fi
+
+# ===== pip =====
+section "pip"
+if command -v pip3 >/dev/null 2>&1; then
+    pip3 cache purge >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
+elif command -v pip >/dev/null 2>&1; then
+    pip cache purge >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
+elif command -v python3 >/dev/null 2>&1; then
+    python3 -m pip cache purge >/dev/null 2>&1 \
+        && echo -e "  ${GREEN}✓${NC} cache do pip limpo" \
+        || echo -e "  ${RED}✗ não consegui limpar cache do pip${NC}"
+else
+    echo -e "  ${YELLOW}- pip não instalado, pulando${NC}"
+fi
+
+# ===== pacman =====
+section "pacman"
+if command -v pacman >/dev/null 2>&1; then
+    local_orphans=$(pacman -Qtdq 2>/dev/null)
+    if [[ -n "$local_orphans" ]]; then
+        sudo pacman -Rns $local_orphans >/dev/null 2>&1 \
+            && echo -e "  ${GREEN}✓${NC} pacotes órfãos removidos"
+    fi
+    sudo pacman -Sc >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do pacman limpo"
+else
+    echo -e "  ${YELLOW}- pacman não encontrado, pulando${NC}"
+fi
+
+# ===== yay =====
+section "yay"
+if command -v yay >/dev/null 2>&1; then
+    yay -Sc >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} cache do yay limpo"
+    echo "  (dica: rode 'yay -scc' para remover também órfãos AUR)"
+else
+    echo -e "  ${YELLOW}- yay não encontrado, pulando${NC}"
+fi
+
+# ===== Navegadores =====
+section "Navegadores"
+
+# Brave
+if [[ -d "$HOME/.config/BraveSoftware" ]]; then
+    remove_dir "$HOME/.config/BraveSoftware/Brave-Browser/Default/Cache" "Brave: Cache"
+    remove_dir "$HOME/.config/BraveSoftware/Brave-Browser/Default/Code Cache" "Brave: Code Cache"
+    remove_dir "$HOME/.config/BraveSoftware/Brave-Browser/Default/Service Worker/CacheStorage" "Brave: CacheStorage"
+else
+    echo -e "  ${YELLOW}- Brave não instalado, pulando${NC}"
+fi
+
+# Firefox (todos os perfis)
+if [[ -d "$HOME/.mozilla/firefox" ]]; then
+    for profile in "$HOME"/.mozilla/firefox/*.default* "$HOME"/.mozilla/firefox/*.release; do
+        [[ -d "$profile" ]] || continue
+        remove_dir "$profile/cache2" "Firefox: cache2 (${profile##*/})"
+        remove_dir "$profile/startupCache" "Firefox: startupCache"
+        remove_dir "$profile/storage/default" "Firefox: storage/default"
+    done
+else
+    echo -e "  ${YELLOW}- Firefox não instalado, pulando${NC}"
+fi
+
+# Chrome
+if [[ -d "$HOME/.config/google-chrome" ]]; then
+    for profile in "$HOME"/.config/google-chrome/*/; do
+        [[ -d "$profile" ]] || continue
+        remove_dir "${profile}Cache" "Chrome: Cache (${profile##*/})"
+        remove_dir "${profile}Code Cache" "Chrome: Code Cache"
+        remove_dir "${profile}Service Worker/CacheStorage" "Chrome: CacheStorage"
+    done
+else
+    echo -e "  ${YELLOW}- Chrome não instalado, pulando${NC}"
+fi
+
+# ===== Arquivos seguros de limpar =====
+section "Arquivos seguros de limpar"
+
+# Journal do systemd (mantém últimos 7 dias)
+if command -v journalctl >/dev/null 2>&1; then
+    before=0
+    for jdir in /var/log/journal /run/log/journal; do
+        [[ -d "$jdir" ]] || continue
+        b=$(du -sb "$jdir" 2>/dev/null | cut -f1)
+        [[ "$b" =~ ^[0-9]+$ ]] && before=$((before + b))
+    done
+    sudo journalctl --vacuum-time=7d >/dev/null 2>&1
+    after=0
+    for jdir in /var/log/journal /run/log/journal; do
+        [[ -d "$jdir" ]] || continue
+        b=$(du -sb "$jdir" 2>/dev/null | cut -f1)
+        [[ "$b" =~ ^[0-9]+$ ]] && after=$((after + b))
+    done
+    freed=$((before - after)); (( freed < 0 )) && freed=0
+    add_freed "$freed"
+    echo -e "  ${GREEN}✓${NC} journal do systemd (mantidos 7 dias, ${human_bytes "$freed"})"
+else
+    echo -e "  ${YELLOW}- journalctl não encontrado, pulando${NC}"
+fi
+
+# Arquivos temporários (antigos de mais de 1 dia)
+for tdir in /tmp /var/tmp; do
+    [[ -d "$tdir" ]] || continue
+    bytes=$(sudo find "$tdir" -mindepth 1 -mtime +1 -exec du -cb {} + 2>/dev/null | tail -1 | awk '{print $1}')
+    [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+    sudo find "$tdir" -mindepth 1 -mtime +1 -delete 2>/dev/null
+    add_freed "$bytes"
+    echo -e "  ${GREEN}✓${NC} $tdir (antigos de 1 dia, ${human_bytes "$bytes"})"
+done
+
+# Lixeira
+trash="$HOME/.local/share/Trash"
+if [[ -d "$trash" ]]; then
+    confirm=false
+    if [[ "$ASSUM_YES" == "true" ]]; then
+        confirm=true
+    else
+        read -r -p "  Esvaziar a lixeira? [S/n] " ans
+        case "$ans" in [Nn]*) confirm=false ;; *) confirm=true ;; esac
+    fi
+    if $confirm; then
+        size=$(du -sh "$trash" 2>/dev/null | cut -f1)
+        bytes=$(du -sb "$trash" 2>/dev/null | cut -f1)
+        rm -rf "${trash:?}/files"/* "${trash:?}/info"/* 2>/dev/null
+        add_freed "$bytes"
+        echo -e "  ${GREEN}✓${NC} lixeira esvaziada (${size:-?})"
+    else
+        echo -e "  ${YELLOW}- lixeira mantida (use -y para pular confirmação)${NC}"
+    fi
+else
+    echo -e "  ${YELLOW}- lixeira vazia ou inexistente${NC}"
+fi
+
+# Miniaturas (legacy e atual)
+remove_dir "$HOME/.thumbnails" "miniaturas (~/.thumbnails)"
+remove_dir "$HOME/.cache/thumbnails" "miniaturas (~/.cache/thumbnails)"
+
+# Cache do usuário (apps regeneram o que precisarem)
+if [[ -d "$HOME/.cache" ]]; then
+    size=$(du -sh "$HOME/.cache" 2>/dev/null | cut -f1)
+    bytes=$(du -sb "$HOME/.cache" 2>/dev/null | cut -f1)
+    rm -rf "${HOME:?}/.cache"/* 2>/dev/null
+    rm -rf "${HOME:?}/.cache"/.[!.]* 2>/dev/null
+    add_freed "$bytes"
+    echo -e "  ${GREEN}✓${NC} ~/.cache limpo (${size:-?})"
+else
+    echo -e "  ${YELLOW}- ~/.cache inexistente${NC}"
+fi
+
+# Flatpak (runtimes não utilizados)
+if command -v flatpak >/dev/null 2>&1; then
+    flatpak uninstall --unused -y >/dev/null 2>&1 \
+        && echo -e "  ${GREEN}✓${NC} runtimes flatpak não utilizados removidos" \
+        || echo -e "  ${YELLOW}- sem flatpak para limpar${NC}"
+else
+    echo -e "  ${YELLOW}- flatpak não instalado, pulando${NC}"
+fi
+
+# ===== Resumo =====
+section "Resumo"
+echo -e "  Espaço total liberado: ${BOLD}${GREEN}$(human_bytes "$TOTAL_BYTES")${NC}"
+echo -e "${GREEN}  Limpeza concluída!${NC}"
+echo
+echo "  Dicas:"
+echo "  - Feche os navegadores antes de rodar o script para garantir"
+echo "    que nenhum arquivo de cache esteja em uso."
+echo "  - Use -y para não pedir confirmação ao esvaziar a lixeira."
+echo "  - Caches e miniaturas são regenerados automaticamente pelos apps."
+echo "  - O total acima soma apenas o que foi medido (diretórios/temporários);"
+echo "    limpezas de pacotes (uv/pip/pacman/yay/flatpak) não entram na soma."
