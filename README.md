@@ -1,7 +1,7 @@
 # leaf
 
-Script de limpeza simples para sistemas Linux baseados em Arch
-(Arch/Manjaro).
+Script de limpeza simples para sistemas Linux (Arch/Manjaro,
+Debian/Ubuntu, Fedora/RHEL).
 
 Remove caches de ferramentas de pacotes e linguagens, caches de
 navegadores e arquivos seguros de limpar. Ao final da execucao, exibe a
@@ -12,8 +12,9 @@ soma do espaco total liberado.
 - bash
 - sudo
 
-As demais ferramentas (uv, pip, pacman, yay, flatpak) sao detectadas em
-runtime: se nao estiverem instaladas, a secao correspondente e pulada.
+As demais ferramentas (uv, pip, pacman, yay, apt, dnf, flatpak) sao
+detectadas em runtime: se nao estiverem instaladas, a secao
+correspondente e pulada.
 
 ## Uso
 
@@ -41,6 +42,9 @@ Sem confirmação na lixeira:
 | pip              | `pip cache purge`                                                |
 | pacman           | pacotes órfãos + `sudo pacman -Sc`                                |
 | yay              | `yay -Sc`                                                        |
+| apt              | `sudo apt-get clean` (Debian/Ubuntu)                             |
+| dnf              | `sudo dnf clean all` (Fedora/RHEL)                               |
+| rpm              | apenas verificação: não possui cache próprio (gerenciado pelo dnf/yum) |
 | Brave            | Cache, Code Cache, CacheStorage                                  |
 | Firefox          | cache2, startupCache, storage/default (todos os perfis)          |
 | Chrome           | Cache, Code Cache, CacheStorage (todos os perfis)                |

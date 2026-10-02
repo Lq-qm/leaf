@@ -2,9 +2,9 @@
 #
 # leaf — Limpeza simples do sistema (Arch/Manjaro)
 #
-# Limpa: uv, pip, pacman, yay, caches de navegadores (Brave, Firefox,
-# Chrome) e arquivos seguros de limpar (journal, temporários, lixeira,
-# miniaturas, ~/.cache, flatpak).
+# Limpa: uv, pip, pacman, yay, apt, dnf, caches de navegadores (Brave,
+# Firefox, Chrome) e arquivos seguros de limpar (journal, temporários,
+# lixeira, miniaturas, ~/.cache, flatpak).
 #
 # Ao final, exibe a SOMA de espaço total liberado.
 #
@@ -164,6 +164,42 @@ if command -v yay >/dev/null 2>&1; then
     echo "  (dica: rode 'yay -scc' para remover também órfãos AUR)"
 else
     echo -e "  ${YELLOW}- yay não encontrado, pulando${NC}"
+fi
+
+# ===== Outros gerenciadores de pacotes (apt/dnf/rpm) =====
+# Detecta quais estão instalados e limpa o cache de cada um.
+section "outros gerenciadores (apt/dnf/rpm)"
+
+# apt (Debian/Ubuntu)
+if command -v apt >/dev/null 2>&1; then
+    progress "limpando cache do apt (apt-get clean)"
+    if sudo apt-get clean; then
+        echo -e "  ${GREEN}✓${NC} cache do apt limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar cache do apt${NC}"
+    fi
+    echo "  (dica: 'sudo apt-get autoremove' remove também pacotes órfãos)"
+else
+    echo -e "  ${YELLOW}- apt não encontrado, pulando${NC}"
+fi
+
+# dnf (Fedora/RHEL)
+if command -v dnf >/dev/null 2>&1; then
+    progress "limpando cache do dnf (dnf clean all)"
+    if sudo dnf clean all; then
+        echo -e "  ${GREEN}✓${NC} cache do dnf limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar cache do dnf${NC}"
+    fi
+else
+    echo -e "  ${YELLOW}- dnf não encontrado, pulando${NC}"
+fi
+
+# rpm (ferramenta de baixo nível — não possui cache próprio)
+if command -v rpm >/dev/null 2>&1; then
+    echo -e "  ${YELLOW}- rpm presente (ferramenta de baixo nível); o cache de pacotes RPM é gerenciado pelo dnf/yum${NC}"
+else
+    echo -e "  ${YELLOW}- rpm não encontrado, pulando${NC}"
 fi
 
 # ===== Navegadores =====
