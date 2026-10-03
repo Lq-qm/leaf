@@ -82,6 +82,7 @@ human_bytes() {
 TOTAL_STEPS=13
 CURRENT_STEP=0
 BAR_WIDTH=20
+BAR_ACTIVE=false
 
 # Repete um caractere n vezes (usado na barra de progresso)
 repeat() {
@@ -90,19 +91,36 @@ repeat() {
     printf '%s' "$out"
 }
 
-# Avança para o próximo passo e exibe o cabeçalho com a barra de progresso
+# Inicia um novo passo: limpa a barra anterior (se ativa) e exibe o cabeçalho
 section() {
     local name="$1"
+    if [[ -t 1 ]] && $BAR_ACTIVE; then
+        printf '\r\033[2K'
+    else
+        echo
+    fi
+    BAR_ACTIVE=false
     CURRENT_STEP=$((CURRENT_STEP + 1))
+    echo -e "${YELLOW}==> [${CURRENT_STEP}/${TOTAL_STEPS}] ${name}${NC}"
+}
+
+# Atualiza a barra de progresso (mesma linha, sem empilhar)
+update_bar() {
     local filled empty bar pct
     filled=$(( CURRENT_STEP * BAR_WIDTH / TOTAL_STEPS ))
     empty=$(( BAR_WIDTH - filled ))
     bar="$(repeat '█' "$filled")$(repeat '░' "$empty")"
     pct=$(( CURRENT_STEP * 100 / TOTAL_STEPS ))
-    echo
-    echo -e "${YELLOW}==> [${CURRENT_STEP}/${TOTAL_STEPS}] ${name}${NC}"
     if [[ -t 1 ]]; then
-        echo -e "  ${CYAN}${bar}${NC}  ${GREEN}${pct}%${NC}"
+        printf '\r\033[2K  %s%s%s  %s%s%%%s' "$CYAN" "$bar" "$NC" "$GREEN" "$pct" "$NC"
+        BAR_ACTIVE=true
+    fi
+}
+
+# Finaliza a barra (quebra a linha ao terminar o script)
+finish_bar() {
+    if [[ -t 1 ]] && $BAR_ACTIVE; then
+        printf '\n'
     fi
 }
 
@@ -134,6 +152,7 @@ if command -v uv >/dev/null 2>&1; then
 else
     echo -e "  ${YELLOW}- uv não instalado, pulando${NC}"
 fi
+update_bar
 
 # ===== pip =====
 section "pip"
@@ -151,6 +170,7 @@ elif command -v python3 >/dev/null 2>&1; then
 else
     echo -e "  ${YELLOW}- pip não instalado, pulando${NC}"
 fi
+update_bar
 
 # ===== pacman =====
 section "pacman"
@@ -173,6 +193,7 @@ if command -v pacman >/dev/null 2>&1; then
 else
     echo -e "  ${YELLOW}- pacman não encontrado, pulando${NC}"
 fi
+update_bar
 
 # ===== yay =====
 section "yay"
@@ -187,6 +208,7 @@ if command -v yay >/dev/null 2>&1; then
 else
     echo -e "  ${YELLOW}- yay não encontrado, pulando${NC}"
 fi
+update_bar
 
 # ===== Outros gerenciadores de pacotes (apt/dnf/rpm) =====
 # Detecta quais estão instalados e limpa o cache de cada um.
@@ -223,6 +245,7 @@ if command -v rpm >/dev/null 2>&1; then
 else
     echo -e "  ${YELLOW}- rpm não encontrado, pulando${NC}"
 fi
+update_bar
 
 # ===== Navegadores =====
 section "Navegadores"
@@ -259,6 +282,7 @@ if [[ -d "$HOME/.config/google-chrome" ]]; then
 else
     echo -e "  ${YELLOW}- Chrome não instalado, pulando${NC}"
 fi
+update_bar
 
 # ===== Arquivos seguros de limpar (um passo por item) =====
 
@@ -281,10 +305,11 @@ if command -v journalctl >/dev/null 2>&1; then
     done
     freed=$((before - after)); (( freed < 0 )) && freed=0
     add_freed "$freed"
-    echo -e "  ${GREEN}✓${NC} journal do systemd (mantidos 7 dias, ${human_bytes "$freed"})"
+    echo -e "  ${GREEN}✓${NC} journal do systemd (mantidos 7 dias, $(human_bytes "$freed"))"
 else
     echo -e "  ${YELLOW}- journalctl não encontrado, pulando${NC}"
 fi
+update_bar
 
 # Arquivos temporários (antigos de mais de 1 dia)
 section "arquivos temporários"
@@ -295,8 +320,9 @@ for tdir in /tmp /var/tmp; do
     [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
     sudo find "$tdir" -mindepth 1 -mtime +1 -delete 2>/dev/null
     add_freed "$bytes"
-    echo -e "  ${GREEN}✓${NC} $tdir (antigos de 1 dia, ${human_bytes "$bytes"})"
+    echo -e "  ${GREEN}✓${NC} $tdir (antigos de 1 dia, $(human_bytes "$bytes"))"
 done
+update_bar
 
 # Lixeira
 section "lixeira"
@@ -321,11 +347,13 @@ if [[ -d "$trash" ]]; then
 else
     echo -e "  ${YELLOW}- lixeira vazia ou inexistente${NC}"
 fi
+update_bar
 
 # Miniaturas (legacy e atual)
 section "miniaturas"
 remove_dir "$HOME/.thumbnails" "miniaturas (~/.thumbnails)"
 remove_dir "$HOME/.cache/thumbnails" "miniaturas (~/.cache/thumbnails)"
+update_bar
 
 # Cache do usuário (apps regeneram o que precisarem)
 section "cache do usuário (~/.cache)"
@@ -339,6 +367,7 @@ if [[ -d "$HOME/.cache" ]]; then
 else
     echo -e "  ${YELLOW}- ~/.cache inexistente${NC}"
 fi
+update_bar
 
 # Flatpak (runtimes não utilizados)
 section "flatpak"
@@ -352,6 +381,7 @@ if command -v flatpak >/dev/null 2>&1; then
 else
     echo -e "  ${YELLOW}- flatpak não instalado, pulando${NC}"
 fi
+update_bar
 
 # ===== Resumo =====
 section "Resumo"
@@ -365,3 +395,5 @@ echo "  - Use -y para não pedir confirmação ao esvaziar a lixeira."
 echo "  - Caches e miniaturas são regenerados automaticamente pelos apps."
 echo "  - O total acima soma apenas o que foi medido (diretórios/temporários);"
 echo "    limpezas de pacotes (uv/pip/pacman/yay/flatpak) não entram na soma."
+update_bar
+finish_bar
