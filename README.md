@@ -1,5 +1,14 @@
 # leaf
 
+```
+⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣄⣀⣀⡀⠀⠀⠀
+⠀⠀⠀⠀⠀⢀⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⠶
+⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠃⠀
+⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀
+⢀⣠⠞⠋⠉⠛⠻⠿⣿⣿⣿⠿⠟⠋⠀⠀⠀⠀⠀
+⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
 Script de limpeza simples para sistemas Linux (Arch/Manjaro,
 Debian/Ubuntu, Fedora/RHEL).
 
