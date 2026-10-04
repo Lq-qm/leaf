@@ -44,16 +44,26 @@ fi
 
 # ===== Cabeçalho (personalizável) =====
 
+# Arte padrão (folha) — personalize com LEAF_ART
+DEFAULT_ART='⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣄⣀⣀⡀⠀⠀⠀
+⠀⠀⠀⠀⠀⢀⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⠶
+⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠃⠀
+⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀
+⢀⣠⠞⠋⠉⠛⠻⠿⣿⣿⣿⠿⠟⠋⠀⠀⠀⠀⠀
+⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀'
+
 print_banner() {
-    local art="${LEAF_ART:-}"
+    local art="${LEAF_ART-$DEFAULT_ART}"
     local title="${LEAF_TITLE:-leaf — limpeza do sistema}"
     local subtitle="${LEAF_SUBTITLE:-caches • pacotes • navegadores • temporários}"
 
     echo
-    while IFS= read -r line; do
-        echo -e "${GREEN}${line}${NC}"
-    done <<< "$art"
-    echo
+    if [[ -n "$art" ]]; then
+        while IFS= read -r line; do
+            echo -e "${GREEN}${line}${NC}"
+        done <<< "$art"
+        echo
+    fi
     echo -e "  ${BOLD}${CYAN}${title}${NC}"
     echo -e "  ${subtitle}"
     echo -e "  ${YELLOW}---------------------------------------------------${NC}"

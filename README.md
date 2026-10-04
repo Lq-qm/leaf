@@ -63,12 +63,13 @@ O cabeçalho do script pode ser personalizado via variáveis de ambiente:
 |---------------|------------------------------------------|
 | LEAF_TITLE    | leaf - limpeza do sistema                |
 | LEAF_SUBTITLE | caches - pacotes - navegadores - temporários |
-| LEAF_ART      | vazio (arte ASCII a definir)             |
+| LEAF_ART      | arte da folha (vazio para ocultar)       |
 
 Exemplo:
 
 ```sh
 LEAF_TITLE="meu limpa" LEAF_SUBTITLE="feito por mim" ./leaf
+LEAF_ART="" ./leaf   # sem arte no cabeçalho
 ```
 
 ## Observações
