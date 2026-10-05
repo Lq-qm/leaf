@@ -91,6 +91,6 @@ LEAF_ART="" ./leaf   # sem arte no cabeçalho
   pacman, yay, flatpak) não entram na soma.
 - O uso de `sudo` é exigido nas seções de pacman, journal e
   temporários.
-- Prompts do pacman/yay: o usuário confirma apenas o primeiro de cada
-  seção (remoção de órfãos no pacman; o `-Sc` no yay). Os demais passam
-  automaticamente (`--noconfirm`).
+- Prompts do pacman/yay: apenas o prompt de remoção de órfãos do pacman
+  é confirmado pelo usuário. A limpeza de cache (`-Sc` do pacman e do
+  yay) passa automaticamente (`--noconfirm`).

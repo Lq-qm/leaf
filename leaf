@@ -208,11 +208,11 @@ fi
 update_bar
 
 # ===== yay =====
-# O yay tem apenas um prompt (-Sc): é o "primeiro do yay", então fica com o usuário.
+# Mesma política do pacman: prompts passam automaticamente (--noconfirm).
 section "yay"
 if command -v yay >/dev/null 2>&1; then
     progress "limpando cache do yay"
-    if yay -Sc; then
+    if yay -Sc --noconfirm; then
         echo -e "  ${GREEN}✓${NC} cache do yay limpo"
     else
         echo -e "  ${RED}✗ falha ao limpar cache do yay${NC}"
