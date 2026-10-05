@@ -183,6 +183,8 @@ fi
 update_bar
 
 # ===== pacman =====
+# Política de prompts: o usuário confirma apenas o PRIMEIRO prompt da seção
+# (remoção de órfãos). Os demais passam automaticamente (--noconfirm).
 section "pacman"
 if command -v pacman >/dev/null 2>&1; then
     local_orphans=$(pacman -Qtdq 2>/dev/null)
@@ -195,7 +197,7 @@ if command -v pacman >/dev/null 2>&1; then
         fi
     fi
     progress "esvaziando cache do pacman (pode demorar)"
-    if sudo pacman -Sc; then
+    if sudo pacman -Sc --noconfirm; then
         echo -e "  ${GREEN}✓${NC} cache do pacman limpo"
     else
         echo -e "  ${RED}✗ falha ao limpar cache do pacman${NC}"
@@ -206,6 +208,7 @@ fi
 update_bar
 
 # ===== yay =====
+# O yay tem apenas um prompt (-Sc): é o "primeiro do yay", então fica com o usuário.
 section "yay"
 if command -v yay >/dev/null 2>&1; then
     progress "limpando cache do yay"

@@ -1,5 +1,14 @@
 # leaf
 
+```
+⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣄⣀⣀⡀⠀⠀⠀
+⠀⠀⠀⠀⠀⢀⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⠶
+⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠃⠀
+⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀
+⢀⣠⠞⠋⠉⠛⠻⠿⣿⣿⣿⠿⠟⠋⠀⠀⠀⠀⠀
+⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
 Script de limpeza simples para sistemas Linux (Arch/Manjaro,
 Debian/Ubuntu, Fedora/RHEL).
 
@@ -82,3 +91,6 @@ LEAF_ART="" ./leaf   # sem arte no cabeçalho
   pacman, yay, flatpak) não entram na soma.
 - O uso de `sudo` é exigido nas seções de pacman, journal e
   temporários.
+- Prompts do pacman/yay: o usuário confirma apenas o primeiro de cada
+  seção (remoção de órfãos no pacman; o `-Sc` no yay). Os demais passam
+  automaticamente (`--noconfirm`).
