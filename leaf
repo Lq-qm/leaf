@@ -2,9 +2,10 @@
 #
 # leaf — Limpeza simples do sistema (Arch/Manjaro)
 #
-# Limpa: uv, pip, pacman, yay, apt, dnf, caches de navegadores (Brave,
-# Firefox, Chrome) e arquivos seguros de limpar (journal, temporários,
-# lixeira, miniaturas, ~/.cache, flatpak).
+# Limpa: uv, pip, ccache/sccache/go, pacman, yay, apt, dnf, caches de
+# navegadores (Brave, Firefox, Chrome) e arquivos seguros de limpar
+# (journal, temporários, relatórios de crash, lixeira, miniaturas, ~/.cache,
+# flatpak).
 #
 # Ao final, exibe a SOMA de espaço total liberado.
 #
@@ -89,7 +90,7 @@ human_bytes() {
 }
 
 # ===== Utilitários =====
-TOTAL_STEPS=13
+TOTAL_STEPS=15
 CURRENT_STEP=0
 BAR_WIDTH=20
 BAR_ACTIVE=false
@@ -225,6 +226,48 @@ if [[ -n "$pip_cmd" ]]; then
     fi
 else
     echo -e "  ${YELLOW}- pip não instalado, pulando${NC}"
+fi
+update_bar
+
+# ===== Caches de compilação =====
+# Compiladores em cache: o custo de limpar é recompilar (CPU), não re-baixar.
+section "caches de compilação"
+cc_found=false
+if command -v ccache >/dev/null 2>&1; then
+    progress "limpando ccache"
+    if ccache -C; then
+        echo -e "  ${GREEN}✓${NC} ccache limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar ccache${NC}"
+    fi
+    cc_found=true
+fi
+if command -v sccache >/dev/null 2>&1; then
+    progress "limpando sccache"
+    if sccache --clear; then
+        echo -e "  ${GREEN}✓${NC} sccache limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar sccache${NC}"
+    fi
+    cc_found=true
+fi
+if command -v go >/dev/null 2>&1; then
+    gocache="$(go env GOCACHE 2>/dev/null)"
+    if [[ -n "${gocache:-}" && -d "$gocache" ]]; then
+        gobytes=$(du -sb "$gocache" 2>/dev/null | cut -f1)
+        if run_spinner "limpando cache de build do go" go clean -cache; then
+            add_freed "${gobytes:-0}"
+            echo -e "  ${GREEN}✓${NC} go ($(human_bytes "${gobytes:-0}"))"
+        else
+            echo -e "  ${RED}✗ falha ao limpar cache do go${NC}"
+        fi
+    else
+        echo -e "  ${YELLOW}- go sem cache de build, pulando${NC}"
+    fi
+    cc_found=true
+fi
+if ! $cc_found; then
+    echo -e "  ${YELLOW}- ccache, sccache e go não instalados, pulando${NC}"
 fi
 update_bar
 
@@ -381,6 +424,48 @@ for tdir in /tmp /var/tmp; do
     add_freed "$bytes"
     echo -e "  ${GREEN}✓${NC} $tdir (antigos de 1 dia, $(human_bytes "$bytes"))"
 done
+update_bar
+
+# ===== Relatórios de crash =====
+# Dumps/relatórios de crash são descartáveis: não há o que re-baixar depois.
+section "relatórios de crash"
+cr_found=false
+# systemd (Arch/Manjaro/Fedora)
+if command -v coredumpctl >/dev/null 2>&1 && [[ -d /var/lib/systemd/coredump ]]; then
+    crbytes=$(sudo du -sb /var/lib/systemd/coredump 2>/dev/null | cut -f1)
+    if sudo coredumpctl cleanup; then
+        add_freed "${crbytes:-0}"
+        echo -e "  ${GREEN}✓${NC} coredumps do systemd ($(human_bytes "${crbytes:-0}"))"
+    else
+        echo -e "  ${RED}✗ falha ao limpar coredumps${NC}"
+    fi
+    cr_found=true
+fi
+# Debian/Ubuntu (apport)
+if [[ -d /var/crash ]] && [[ -n "$(ls -A /var/crash 2>/dev/null)" ]]; then
+    crbytes=$(sudo du -sb /var/crash 2>/dev/null | cut -f1)
+    if sudo rm -rf /var/crash/* 2>/dev/null; then
+        add_freed "${crbytes:-0}"
+        echo -e "  ${GREEN}✓${NC} relatórios do apport ($(human_bytes "${crbytes:-0}"))"
+    else
+        echo -e "  ${RED}✗ falha ao limpar /var/crash${NC}"
+    fi
+    cr_found=true
+fi
+# Fedora (abrt)
+if command -v abrt >/dev/null 2>&1 && [[ -d /var/lib/abrt ]] && [[ -n "$(ls -A /var/lib/abrt 2>/dev/null)" ]]; then
+    crbytes=$(sudo du -sb /var/lib/abrt 2>/dev/null | cut -f1)
+    if abrt clean; then
+        add_freed "${crbytes:-0}"
+        echo -e "  ${GREEN}✓${NC} relatórios do abrt ($(human_bytes "${crbytes:-0}"))"
+    else
+        echo -e "  ${RED}✗ falha ao limpar abrt${NC}"
+    fi
+    cr_found=true
+fi
+if ! $cr_found; then
+    echo -e "  ${YELLOW}- nenhum relatório de crash encontrado, pulando${NC}"
+fi
 update_bar
 
 # Lixeira

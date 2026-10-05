@@ -49,6 +49,7 @@ Sem confirmação na lixeira:
 |------------------|------------------------------------------------------------------|
 | uv               | `uv cache clean`                                                 |
 | pip              | `pip cache purge`                                                |
+| ccache/sccache/go| caches de compilação (`ccache -C`, `sccache --clear`, `go clean -cache`) |
 | pacman           | pacotes órfãos + `sudo pacman -Sc`                                |
 | yay              | `yay -Sc`                                                        |
 | apt              | `sudo apt-get clean` (Debian/Ubuntu)                             |
@@ -59,6 +60,7 @@ Sem confirmação na lixeira:
 | Chrome           | Cache, Code Cache, CacheStorage (todos os perfis)                |
 | journal          | `journalctl --vacuum-time=7d` (mantém os últimos 7 dias)         |
 | temporários      | `/tmp` e `/var/tmp`, apenas arquivos com mais de 1 dia           |
+| relatórios de crash | coredumps (`sudo coredumpctl cleanup`), `/var/crash` (Debian), `abrt clean` (Fedora) |
 | lixeira          | `~/.local/share/Trash` (com confirmação, exceto com -y)          |
 | miniaturas       | `~/.thumbnails` e `~/.cache/thumbnails`                          |
 | cache do usuário | `~/.cache`                                                       |
@@ -99,3 +101,6 @@ LEAF_ART="" ./leaf   # sem arte no cabeçalho
   Comandos interativos (sudo, pacman, yay) mostram a própria saída em
   vez do spinner.
 - O resumo final destaca o total liberado em uma caixa decorativa.
+- Caches que exigiriam re-download (npm, yarn, pnpm, conda, imagens
+  docker) são intencionalmente NÃO limpos: o custo de re-baixar não
+  compensa o espaço liberado.
