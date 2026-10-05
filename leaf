@@ -139,15 +139,55 @@ progress() {
     echo -e "  ${YELLOW}... $1...${NC}"
 }
 
-# Remove um diretório, reportando e somando o espaço liberado
+# Spinner animado (⠋⠙⠹...) enquanto um PID roda. No-op fora de TTY.
+# Adaptado de exemplo5.sh
+spin_until() {
+    local pid="$1" msg="$2"
+    [[ -t 1 ]] || return 0
+    local chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        printf '\r  \033[0;36m%s\033[0m %s' "${chars:i:1}" "$msg"
+        i=$(( (i + 1) % ${#chars} ))
+        sleep 0.1
+    done
+    printf '\r\033[2K'
+}
+
+# Executa um comando com spinner, exibindo a saída dele ao final.
+# ATENÇÃO: somente comandos NÃO interativos (sem prompts, sem sudo).
+run_spinner() {
+    local msg="$1"; shift
+    if [[ ! -t 1 ]]; then
+        "$@"
+        return $?
+    fi
+    local tmp pid out rc
+    tmp=$(mktemp)
+    { "$@" >"$tmp" 2>&1; printf '%s' "$?" > "${tmp}.rc"; } &
+    pid=$!
+    spin_until "$pid" "$msg"
+    wait "$pid" 2>/dev/null
+    out=$(cat "$tmp" 2>/dev/null)
+    rc=$(cat "${tmp}.rc" 2>/dev/null)
+    rm -f "$tmp" "${tmp}.rc"
+    [[ "$rc" =~ ^[0-9]+$ ]] || rc=1
+    [[ -n "$out" ]] && echo "$out"
+    return "$rc"
+}
+
+# Remove um diretório (com spinner), reportando e somando o espaço liberado
 remove_dir() {
     local dir="$1" name="$2"
     if [[ -d "$dir" ]]; then
-        local bytes
-        progress "limpando ${name}"
-        bytes=$(du -sb "$dir" 2>/dev/null | cut -f1)
-        rm -rf "${dir:?}"
-        add_freed "$bytes"
+        local bytes tmp pid
+        tmp=$(mktemp)
+        { du -sb "$dir" 2>/dev/null | cut -f1 > "$tmp"; rm -rf "${dir:?}"; } &
+        pid=$!
+        spin_until "$pid" "limpando ${name}"
+        wait "$pid" 2>/dev/null
+        bytes=$(cat "$tmp" 2>/dev/null)
+        rm -f "$tmp"
+        add_freed "${bytes:-0}"
         echo -e "  ${GREEN}✓${NC} ${name} ($(human_bytes "${bytes:-0}"))"
     else
         echo -e "  ${RED}✗${NC} ${name} (diretório não encontrado)"
@@ -157,8 +197,11 @@ remove_dir() {
 # ===== uv =====
 section "uv"
 if command -v uv >/dev/null 2>&1; then
-    progress "limpando cache do uv"
-    uv cache clean && echo -e "  ${GREEN}✓${NC} cache do uv limpo"
+    if run_spinner "limpando cache do uv" uv cache clean; then
+        echo -e "  ${GREEN}✓${NC} cache do uv limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar cache do uv${NC}"
+    fi
 else
     echo -e "  ${YELLOW}- uv não instalado, pulando${NC}"
 fi
@@ -166,17 +209,20 @@ update_bar
 
 # ===== pip =====
 section "pip"
+pip_cmd=""
 if command -v pip3 >/dev/null 2>&1; then
-    progress "limpando cache do pip"
-    pip3 cache purge && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
+    pip_cmd="pip3"
 elif command -v pip >/dev/null 2>&1; then
-    progress "limpando cache do pip"
-    pip cache purge && echo -e "  ${GREEN}✓${NC} cache do pip limpo"
+    pip_cmd="pip"
 elif command -v python3 >/dev/null 2>&1; then
-    progress "limpando cache do pip"
-    python3 -m pip cache purge \
-        && echo -e "  ${GREEN}✓${NC} cache do pip limpo" \
-        || echo -e "  ${RED}✗ não consegui limpar cache do pip${NC}"
+    pip_cmd="python3 -m pip"
+fi
+if [[ -n "$pip_cmd" ]]; then
+    if run_spinner "limpando cache do pip" $pip_cmd cache purge; then
+        echo -e "  ${GREEN}✓${NC} cache do pip limpo"
+    else
+        echo -e "  ${RED}✗ falha ao limpar cache do pip${NC}"
+    fi
 else
     echo -e "  ${YELLOW}- pip não instalado, pulando${NC}"
 fi
@@ -345,14 +391,26 @@ if [[ -d "$trash" ]]; then
     if [[ "$ASSUM_YES" == "true" ]]; then
         confirm=true
     else
-        read -r -p "  Esvaziar a lixeira? [S/n] " ans
-        case "$ans" in [Nn]*) confirm=false ;; *) confirm=true ;; esac
+        # Pergunta de novo se a resposta for inválida (adaptado de exemplo7.sh)
+        while true; do
+            read -r -p "  Esvaziar a lixeira? [S/n] " ans
+            case "$ans" in
+                [Nn]*) confirm=false; break ;;
+                ""|[Ss]*) confirm=true; break ;;
+            esac
+            echo -e "  ${YELLOW}responda s (sim) ou n (não)${NC}"
+        done
     fi
     if $confirm; then
-        progress "esvaziando lixeira"
-        bytes=$(du -sb "$trash" 2>/dev/null | cut -f1)
-        rm -rf "${trash:?}/files"/* "${trash:?}/info"/* 2>/dev/null
-        add_freed "$bytes"
+        tmp=$(mktemp)
+        { du -sb "$trash" 2>/dev/null | cut -f1 > "$tmp";
+          rm -rf "${trash:?}/files"/* "${trash:?}/info"/* 2>/dev/null; } &
+        pid=$!
+        spin_until "$pid" "esvaziando lixeira"
+        wait "$pid" 2>/dev/null
+        bytes=$(cat "$tmp" 2>/dev/null)
+        rm -f "$tmp"
+        add_freed "${bytes:-0}"
         echo -e "  ${GREEN}✓${NC} lixeira esvaziada ($(human_bytes "${bytes:-0}"))"
     else
         echo -e "  ${YELLOW}- lixeira mantida (use -y para pular confirmação)${NC}"
@@ -371,11 +429,16 @@ update_bar
 # Cache do usuário (apps regeneram o que precisarem)
 section "cache do usuário (~/.cache)"
 if [[ -d "$HOME/.cache" ]]; then
-    progress "limpando ~/.cache (pode demorar)"
-    bytes=$(du -sb "$HOME/.cache" 2>/dev/null | cut -f1)
-    rm -rf "${HOME:?}/.cache"/* 2>/dev/null
-    rm -rf "${HOME:?}/.cache"/.[!.]* 2>/dev/null
-    add_freed "$bytes"
+    tmp=$(mktemp)
+    { du -sb "$HOME/.cache" 2>/dev/null | cut -f1 > "$tmp";
+      rm -rf "${HOME:?}/.cache"/* 2>/dev/null;
+      rm -rf "${HOME:?}/.cache"/.[!.]* 2>/dev/null; } &
+    pid=$!
+    spin_until "$pid" "limpando ~/.cache"
+    wait "$pid" 2>/dev/null
+    bytes=$(cat "$tmp" 2>/dev/null)
+    rm -f "$tmp"
+    add_freed "${bytes:-0}"
     echo -e "  ${GREEN}✓${NC} ~/.cache limpo ($(human_bytes "${bytes:-0}"))"
 else
     echo -e "  ${YELLOW}- ~/.cache inexistente${NC}"
@@ -385,8 +448,7 @@ update_bar
 # Flatpak (runtimes não utilizados)
 section "flatpak"
 if command -v flatpak >/dev/null 2>&1; then
-    progress "removendo runtimes flatpak não utilizados"
-    if flatpak uninstall --unused -y; then
+    if run_spinner "removendo runtimes flatpak não utilizados" flatpak uninstall --unused -y; then
         echo -e "  ${GREEN}✓${NC} runtimes flatpak não utilizados removidos"
     else
         echo -e "  ${YELLOW}- nada a remover no flatpak${NC}"
@@ -398,7 +460,13 @@ update_bar
 
 # ===== Resumo =====
 section "Resumo"
-echo -e "  Espaço total liberado: ${BOLD}${GREEN}$(human_bytes "$TOTAL_BYTES")${NC}"
+# Destaque em caixa (adaptado de exemplo6.sh)
+total_human="$(human_bytes "$TOTAL_BYTES")"
+box_text="Espaço total liberado: ${total_human}"
+box_line="$(repeat '─' $(( ${#box_text} + 4 )))"
+echo -e "  ${CYAN}╭${box_line}╮${NC}"
+echo -e "  ${CYAN}│${NC}  Espaço total liberado: ${BOLD}${GREEN}${total_human}${NC}  ${CYAN}│${NC}"
+echo -e "  ${CYAN}╰${box_line}╯${NC}"
 echo -e "${GREEN}  Limpeza concluída!${NC}"
 echo
 echo "  Dicas:"

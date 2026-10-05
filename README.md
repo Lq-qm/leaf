@@ -94,3 +94,8 @@ LEAF_ART="" ./leaf   # sem arte no cabeçalho
 - Prompts do pacman/yay: apenas o prompt de remoção de órfãos do pacman
   é confirmado pelo usuário. A limpeza de cache (`-Sc` do pacman e do
   yay) passa automaticamente (`--noconfirm`).
+- Operações locais demoradas (caches de uv/pip/flatpak, lixeira,
+  `~/.cache`, miniaturas) exibem um spinner animado enquanto rodam.
+  Comandos interativos (sudo, pacman, yay) mostram a própria saída em
+  vez do spinner.
+- O resumo final destaca o total liberado em uma caixa decorativa.
