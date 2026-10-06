@@ -101,6 +101,9 @@ LEAF_ART="" ./leaf   # sem arte no cabeçalho
   Comandos interativos (sudo, pacman, yay) mostram a própria saída em
   vez do spinner.
 - O resumo final destaca o total liberado em uma caixa decorativa.
+- Abertura (depois do banner) e encerramento (após "Limpeza concluída!")
+  usam uma onda na cor da folha — verde e verde em negrito, a mesma do
+  banner — (adaptada de exemplo.sh), só em TTY.
 - Caches que exigiriam re-download (npm, yarn, pnpm, conda, imagens
   docker) são intencionalmente NÃO limpos: o custo de re-baixar não
   compensa o espaço liberado.
