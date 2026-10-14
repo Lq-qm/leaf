@@ -92,17 +92,16 @@ human_bytes() {
 # ===== Utilitários =====
 TOTAL_STEPS=15
 CURRENT_STEP=0
-BAR_WIDTH=20
 BAR_ACTIVE=false
 
-# Repete um caractere n vezes (usado na barra de progresso)
+# Repete um caractere n vezes (usado na caixa do resumo)
 repeat() {
     local char="$1" n="$2" out=""
     while (( n-- > 0 )); do out+="$char"; done
     printf '%s' "$out"
 }
 
-# Inicia um novo passo: limpa a barra anterior (se ativa) e exibe o cabeçalho
+# Inicia um novo passo: limpa a linha de porcentagem anterior (se ativa) e exibe o cabeçalho
 section() {
     local name="$1"
     if [[ -t 1 ]] && $BAR_ACTIVE; then
@@ -115,20 +114,18 @@ section() {
     echo -e "${YELLOW}==> [${CURRENT_STEP}/${TOTAL_STEPS}] ${name}${NC}"
 }
 
-# Atualiza a barra de progresso (mesma linha, sem empilhar)
+# Atualiza a porcentagem de progresso (mesma linha, sem empilhar)
+# Cor: a mesma da folha do banner (verde).
 update_bar() {
-    local filled empty bar pct
-    filled=$(( CURRENT_STEP * BAR_WIDTH / TOTAL_STEPS ))
-    empty=$(( BAR_WIDTH - filled ))
-    bar="$(repeat '█' "$filled")$(repeat '░' "$empty")"
+    local pct
     pct=$(( CURRENT_STEP * 100 / TOTAL_STEPS ))
     if [[ -t 1 ]]; then
-        printf '\r\033[2K  %s%s%s  %s%s%%%s' "$CYAN" "$bar" "$NC" "$GREEN" "$pct" "$NC"
+        printf '\r\033[2K  %s%s%%%s' "$GREEN" "$pct" "$NC"
         BAR_ACTIVE=true
     fi
 }
 
-# Finaliza a barra (quebra a linha ao terminar o script)
+# Finaliza a porcentagem (quebra a linha ao terminar o script)
 finish_bar() {
     if [[ -t 1 ]] && $BAR_ACTIVE; then
         printf '\n'
