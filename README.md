@@ -1,5 +1,14 @@
 # leaf
 
+```
+⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣄⣀⣀⡀⠀⠀⠀
+⠀⠀⠀⠀⠀⢀⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⠶
+⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠃⠀
+⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀
+⢀⣠⠞⠋⠉⠛⠻⠿⣿⣿⣿⠿⠟⠋⠀⠀⠀⠀⠀
+⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
 Script de limpeza simples para sistemas Linux (Arch/Manjaro,
 Debian/Ubuntu, Fedora/RHEL).
 
@@ -41,7 +50,7 @@ Sem confirmação na lixeira:
 | uv               | `uv cache clean`                                                 |
 | pip              | `pip cache purge`                                                |
 | ccache/sccache/go| caches de compilação (`ccache -C`, `sccache --clear`, `go clean -cache`) |
-| pacman           | pacotes órfãos + `sudo pacman -Sc`                                |
+| pacman           | pacotes órfãos + `sudo pacman -Sc` + log (`/var/log/pacman.log`)   |
 | yay              | `yay -Sc`                                                        |
 | apt              | `sudo apt-get clean` (Debian/Ubuntu)                             |
 | dnf              | `sudo dnf clean all` (Fedora/RHEL)                               |
@@ -80,8 +89,8 @@ LEAF_ART="" ./leaf   # sem arte no cabeçalho
   arquivo de cache esteja em uso.
 - Caches e miniaturas são regenerados automaticamente pelas aplicações.
 - O total de espaço liberado soma apenas o que foi medido em bytes
-  (diretórios, temporários, journal). As limpezas de pacotes (uv, pip,
-  pacman, yay, flatpak) não entram na soma.
+  (diretórios, temporários, journal, log do pacman). As limpezas de
+  pacotes (uv, pip, pacman, yay, flatpak) não entram na soma.
 - O uso de `sudo` é exigido nas seções de pacman, journal e
   temporários.
 - Prompts do pacman/yay: apenas o prompt de remoção de órfãos do pacman
@@ -92,9 +101,6 @@ LEAF_ART="" ./leaf   # sem arte no cabeçalho
   Comandos interativos (sudo, pacman, yay) mostram a própria saída em
   vez do spinner.
 - O resumo final destaca o total liberado em uma caixa decorativa.
-- Abertura (depois do banner) e encerramento (após "Limpeza concluída!")
-  usam uma onda na cor da folha — verde e verde em negrito, a mesma do
-  banner — (adaptada de exemplo.sh), só em TTY.
 - Caches que exigiriam re-download (npm, yarn, pnpm, conda, imagens
   docker) são intencionalmente NÃO limpos: o custo de re-baixar não
   compensa o espaço liberado.

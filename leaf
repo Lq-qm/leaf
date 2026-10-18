@@ -261,6 +261,19 @@ if command -v pacman >/dev/null 2>&1; then
     else
         echo -e "  ${RED}✗ falha ao limpar cache do pacman${NC}"
     fi
+    # log do pacman: esvazia o arquivo (preserva inode e permissões)
+    plog="/var/log/pacman.log"
+    if [[ -f "$plog" ]]; then
+        progress "esvaziando log do pacman"
+        lsize=$(stat -c %s "$plog" 2>/dev/null)
+        lsize=${lsize:-0}
+        if sudo truncate -s 0 "$plog" 2>/dev/null; then
+            add_freed "$lsize"
+            echo -e "  ${GREEN}✓${NC} log do pacman esvaziado ($(human_bytes "$lsize"))"
+        else
+            echo -e "  ${RED}✗ falha ao esvaziar o log do pacman${NC}"
+        fi
+    fi
 else
     echo -e "  ${YELLOW}- pacman não encontrado, pulando${NC}"
 fi
@@ -517,7 +530,7 @@ echo "  - Feche os navegadores antes de rodar o script para garantir"
 echo "    que nenhum arquivo de cache esteja em uso."
 echo "  - Use -y para não pedir confirmação ao esvaziar a lixeira."
 echo "  - Caches e miniaturas são regenerados automaticamente pelos apps."
-echo "  - O total acima soma apenas o que foi medido (diretórios/temporários);"
+echo "  - O total acima soma apenas o que foi medido (diretórios/temporários/log)"
 echo "    limpezas de pacotes (uv/pip/pacman/yay/flatpak) não entram na soma."
 echo
 echo -e "${GREEN}${BOLD}  Limpeza concluída!${NC}"
