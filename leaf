@@ -415,13 +415,25 @@ done
 section "relatórios de crash"
 cr_found=false
 # systemd (Arch/Manjaro/Fedora)
-if command -v coredumpctl >/dev/null 2>&1 && [[ -d /var/lib/systemd/coredump ]]; then
+if [[ -d /var/lib/systemd/coredump ]]; then
     crbytes=$(sudo du -sb /var/lib/systemd/coredump 2>/dev/null | cut -f1)
-    if sudo coredumpctl cleanup; then
-        add_freed "${crbytes:-0}" "coredumps do systemd"
-        echo -e "  ${GREEN}✓${NC} coredumps do systemd ($(human_bytes "${crbytes:-0}"))"
+    [[ "$crbytes" =~ ^[0-9]+$ ]] || crbytes=0
+    if (( crbytes > 0 )); then
+        progress "removendo coredumps do systemd"
+        # Prefere 'coredumpctl cleanup'; em builds sem esse verbo
+        # (ex.: systemd reduzida do Arch), remove os arquivos direto.
+        if command -v coredumpctl >/dev/null 2>&1 && sudo coredumpctl cleanup 2>/dev/null; then
+            :
+        else
+            sudo find /var/lib/systemd/coredump -mindepth 1 -delete 2>/dev/null
+        fi
+        after=$(sudo du -sb /var/lib/systemd/coredump 2>/dev/null | cut -f1)
+        [[ "$after" =~ ^[0-9]+$ ]] || after=0
+        freed=$(( crbytes - after )); (( freed < 0 )) && freed=0
+        add_freed "$freed" "coredumps do systemd"
+        echo -e "  ${GREEN}✓${NC} coredumps do systemd ($(human_bytes "$freed"))"
     else
-        echo -e "  ${RED}✗ falha ao limpar coredumps${NC}"
+        echo -e "  ${YELLOW}- nenhum coredump para limpar${NC}"
     fi
     cr_found=true
 fi
