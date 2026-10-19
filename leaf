@@ -75,9 +75,16 @@ print_banner
 # ===== Contador de espaço liberado =====
 TOTAL_BYTES=0
 
+# Registra espaço liberado; $2 (rótulo) vira o detalhamento do resumo.
+FREED_ITEMS=()
 add_freed() {
-    local b="${1:-}"
-    [[ "$b" =~ ^[0-9]+$ ]] && TOTAL_BYTES=$((TOTAL_BYTES + b))
+    local b="${1:-}" label="${2:-}"
+    [[ "$b" =~ ^[0-9]+$ ]] || return 0
+    TOTAL_BYTES=$((TOTAL_BYTES + b))
+    if [[ -n "$label" ]]; then
+        FREED_ITEMS+=("$label|${b}")
+    fi
+    return 0
 }
 
 # Converte bytes para formato legível
@@ -161,7 +168,7 @@ remove_dir() {
         wait "$pid" 2>/dev/null
         bytes=$(cat "$tmp" 2>/dev/null)
         rm -f "$tmp"
-        add_freed "${bytes:-0}"
+        add_freed "${bytes:-0}" "$name"
         echo -e "  ${GREEN}✓${NC} ${name} ($(human_bytes "${bytes:-0}"))"
     else
         echo -e "  ${RED}✗${NC} ${name} (diretório não encontrado)"
@@ -227,7 +234,7 @@ if command -v go >/dev/null 2>&1; then
     if [[ -n "${gocache:-}" && -d "$gocache" ]]; then
         gobytes=$(du -sb "$gocache" 2>/dev/null | cut -f1)
         if run_spinner "limpando cache de build do go" go clean -cache; then
-            add_freed "${gobytes:-0}"
+            add_freed "${gobytes:-0}" "cache de build do go"
             echo -e "  ${GREEN}✓${NC} go ($(human_bytes "${gobytes:-0}"))"
         else
             echo -e "  ${RED}✗ falha ao limpar cache do go${NC}"
@@ -268,7 +275,7 @@ if command -v pacman >/dev/null 2>&1; then
         lsize=$(stat -c %s "$plog" 2>/dev/null)
         lsize=${lsize:-0}
         if sudo truncate -s 0 "$plog" 2>/dev/null; then
-            add_freed "$lsize"
+            add_freed "$lsize" "log do pacman"
             echo -e "  ${GREEN}✓${NC} log do pacman esvaziado ($(human_bytes "$lsize"))"
         else
             echo -e "  ${RED}✗ falha ao esvaziar o log do pacman${NC}"
@@ -385,7 +392,7 @@ if command -v journalctl >/dev/null 2>&1; then
         [[ "$b" =~ ^[0-9]+$ ]] && after=$((after + b))
     done
     freed=$((before - after)); (( freed < 0 )) && freed=0
-    add_freed "$freed"
+    add_freed "$freed" "journal do systemd"
     echo -e "  ${GREEN}✓${NC} journal do systemd (mantidos 7 dias, $(human_bytes "$freed"))"
 else
     echo -e "  ${YELLOW}- journalctl não encontrado, pulando${NC}"
@@ -399,7 +406,7 @@ for tdir in /tmp /var/tmp; do
     bytes=$(sudo find "$tdir" -mindepth 1 -mtime +1 -exec du -cb {} + 2>/dev/null | tail -1 | awk '{print $1}')
     [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
     sudo find "$tdir" -mindepth 1 -mtime +1 -delete 2>/dev/null
-    add_freed "$bytes"
+    add_freed "$bytes" "$tdir"
     echo -e "  ${GREEN}✓${NC} $tdir (antigos de 1 dia, $(human_bytes "$bytes"))"
 done
 
@@ -411,7 +418,7 @@ cr_found=false
 if command -v coredumpctl >/dev/null 2>&1 && [[ -d /var/lib/systemd/coredump ]]; then
     crbytes=$(sudo du -sb /var/lib/systemd/coredump 2>/dev/null | cut -f1)
     if sudo coredumpctl cleanup; then
-        add_freed "${crbytes:-0}"
+        add_freed "${crbytes:-0}" "coredumps do systemd"
         echo -e "  ${GREEN}✓${NC} coredumps do systemd ($(human_bytes "${crbytes:-0}"))"
     else
         echo -e "  ${RED}✗ falha ao limpar coredumps${NC}"
@@ -422,7 +429,7 @@ fi
 if [[ -d /var/crash ]] && [[ -n "$(ls -A /var/crash 2>/dev/null)" ]]; then
     crbytes=$(sudo du -sb /var/crash 2>/dev/null | cut -f1)
     if sudo rm -rf /var/crash/* 2>/dev/null; then
-        add_freed "${crbytes:-0}"
+        add_freed "${crbytes:-0}" "relatórios do apport (Debian)"
         echo -e "  ${GREEN}✓${NC} relatórios do apport ($(human_bytes "${crbytes:-0}"))"
     else
         echo -e "  ${RED}✗ falha ao limpar /var/crash${NC}"
@@ -433,7 +440,7 @@ fi
 if command -v abrt >/dev/null 2>&1 && [[ -d /var/lib/abrt ]] && [[ -n "$(ls -A /var/lib/abrt 2>/dev/null)" ]]; then
     crbytes=$(sudo du -sb /var/lib/abrt 2>/dev/null | cut -f1)
     if abrt clean; then
-        add_freed "${crbytes:-0}"
+        add_freed "${crbytes:-0}" "relatórios do abrt (Fedora)"
         echo -e "  ${GREEN}✓${NC} relatórios do abrt ($(human_bytes "${crbytes:-0}"))"
     else
         echo -e "  ${RED}✗ falha ao limpar abrt${NC}"
@@ -471,7 +478,7 @@ if [[ -d "$trash" ]]; then
         wait "$pid" 2>/dev/null
         bytes=$(cat "$tmp" 2>/dev/null)
         rm -f "$tmp"
-        add_freed "${bytes:-0}"
+        add_freed "${bytes:-0}" "lixeira"
         echo -e "  ${GREEN}✓${NC} lixeira esvaziada ($(human_bytes "${bytes:-0}"))"
     else
         echo -e "  ${YELLOW}- lixeira mantida (use -y para pular confirmação)${NC}"
@@ -497,7 +504,7 @@ if [[ -d "$HOME/.cache" ]]; then
     wait "$pid" 2>/dev/null
     bytes=$(cat "$tmp" 2>/dev/null)
     rm -f "$tmp"
-    add_freed "${bytes:-0}"
+    add_freed "${bytes:-0}" "cache do usuário (~/.cache)"
     echo -e "  ${GREEN}✓${NC} ~/.cache limpo ($(human_bytes "${bytes:-0}"))"
 else
     echo -e "  ${YELLOW}- ~/.cache inexistente${NC}"
@@ -524,6 +531,18 @@ box_line="$(repeat '─' $(( ${#box_text} + 4 )))"
 echo -e "  ${CYAN}╭${box_line}╮${NC}"
 echo -e "  ${CYAN}│${NC}  Espaço total liberado: ${BOLD}${GREEN}${total_human}${NC}  ${CYAN}│${NC}"
 echo -e "  ${CYAN}╰${box_line}╯${NC}"
+# Detalhamento: itens que contribuíram para o total (somente > 0)
+detail=""
+for item in "${FREED_ITEMS[@]}"; do
+    b="${item##*|}"
+    if (( b > 0 )); then
+        detail+="    - ${item%%|*}: $(human_bytes "$b")"$'\n'
+    fi
+done
+if [[ -n "$detail" ]]; then
+    echo "  Detalhamento:"
+    printf '%s' "$detail"
+fi
 echo
 echo "  Dicas:"
 echo "  - Feche os navegadores antes de rodar o script para garantir"
