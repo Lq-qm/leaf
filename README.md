@@ -1,5 +1,14 @@
 # leaf
 
+```
+⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣄⣀⣀⡀⠀⠀⠀
+⠀⠀⠀⠀⠀⢀⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⠶
+⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠃⠀
+⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀
+⢀⣠⠞⠋⠉⠛⠻⠿⣿⣿⣿⠿⠟⠋⠀⠀⠀⠀⠀
+⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
 Script de limpeza simples para sistemas Linux (Arch/Manjaro,
 Debian/Ubuntu, Fedora/RHEL).
 
@@ -51,7 +60,8 @@ Sem confirmação na lixeira:
 | Chrome           | Cache, Code Cache, CacheStorage (todos os perfis)                |
 | journal          | `journalctl --vacuum-time=7d` (mantém os últimos 7 dias)         |
 | temporários      | `/tmp` e `/var/tmp`, apenas arquivos com mais de 1 dia           |
-| relatórios de crash | coredumps (`sudo coredumpctl cleanup`), `/var/crash` (Debian), `abrt clean` (Fedora) |
+| coredumps do systemd | arquivos `core.*` em `/var/lib/systemd/coredump` (`coredumpctl cleanup` ou remoção direta) |
+| relatórios de crash | `/var/crash` (apport, Debian), `abrt clean` (Fedora) |
 | lixeira          | `~/.local/share/Trash` (com confirmação, exceto com -y)          |
 | miniaturas       | `~/.thumbnails` e `~/.cache/thumbnails`                          |
 | cache do usuário | `~/.cache`                                                       |
