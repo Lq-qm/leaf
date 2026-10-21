@@ -10,8 +10,13 @@
 # Ao final, exibe a SOMA de espaço total liberado.
 #
 # Uso:
-#   ./leaf [-y]
-#     -y, --yes   não pede confirmação para esvaziar a lixeira
+#   ./leaf [-y]               limpeza completa do sistema
+#   ./leaf [-y] -r PACOTE...  remove pacotes do pacman (sudo pacman -Rns) e sai
+#
+# Opções:
+#   -y, --yes          não pede confirmação para esvaziar a lixeira
+#   -r, --remove PKG.. remove os pacotes listados (e dependências órfãs) e sai
+#   -h, --help         mostra a ajuda
 #
 # Personalização (variáveis de ambiente):
 #   LEAF_ART       arte ASCII exibida no cabeçalho
@@ -25,9 +30,29 @@ set -u
 
 # ===== Flags =====
 ASSUM_YES=false
-for arg in "$@"; do
-    case "$arg" in
-        -y|--yes) ASSUM_YES=true ;;
+REMOVE_PKGS=()
+while (( $# )); do
+    case "$1" in
+        -y|--yes) ASSUM_YES=true; shift ;;
+        -r|--remove)
+            shift
+            (( $# )) || { echo "erro: -r precisa de pelo menos um pacote" >&2; exit 1; }
+            while (( $# )) && [[ "${1:0:1}" != "-" ]]; do
+                REMOVE_PKGS+=("$1"); shift
+            done
+            ;;
+        -h|--help)
+            echo "uso: leaf [-y] [-r PACOTE...]"
+            echo "  -y, --yes          não pede confirmação ao esvaziar a lixeira"
+            echo "  -r, --remove PKG.. remove os pacotes do pacman (sudo pacman -Rns) e sai"
+            echo "  -h, --help         mostra esta ajuda"
+            exit 0
+            ;;
+        *)
+            echo "erro: opção desconhecida: $1" >&2
+            echo "uso: leaf [-y] [-r PACOTE...]" >&2
+            exit 1
+            ;;
     esac
 done
 
@@ -174,6 +199,23 @@ remove_dir() {
         echo -e "  ${RED}✗${NC} ${name} (diretório não encontrado)"
     fi
 }
+
+# ===== Modo: remover pacotes (-r) =====
+# Remove os pacotes listados (com dependências órfãs, -s) e sai, sem rodar
+# a limpeza completa. O pacman confirma a remoção por conta própria e
+# mostra as dependências que saem junto.
+if (( ${#REMOVE_PKGS[@]} > 0 )); then
+    echo
+    echo "  Pacotes a remover: ${REMOVE_PKGS[*]}"
+    if sudo pacman -Rns "${REMOVE_PKGS[@]}"; then
+        echo -e "  ${GREEN}✓${NC} pacotes removidos"
+        echo
+        echo "  Concluído!"
+        exit 0
+    fi
+    echo -e "  ${RED}✗ falha ao remover os pacotes (cancelado ou erro do pacman)${NC}"
+    exit 1
+fi
 
 # ===== uv =====
 section "uv"

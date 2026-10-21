@@ -27,6 +27,8 @@ correspondente e pulada.
 
 ## Uso
 
+Limpeza completa:
+
 ```sh
 ./leaf
 ```
@@ -37,11 +39,20 @@ Sem confirmação na lixeira:
 ./leaf -y
 ```
 
+Remover pacotes do pacman (remove também as dependências órfãs; o próprio
+pacman pede confirmação) e sair, sem rodar a limpeza completa:
+
+```sh
+./leaf -r nome-pacote [outros-pacotes...]
+```
+
 ## Opções
 
-| Flag       | Descrição                                        |
-|------------|--------------------------------------------------|
-| -y, --yes  | Não pede confirmação para esvaziar a lixeira     |
+| Flag           | Descrição                                                    |
+|----------------|--------------------------------------------------------------|
+| -y, --yes      | Não pede confirmação para esvaziar a lixeira                 |
+| -r, --remove   | Remove os pacotes listados (`sudo pacman -Rns`) e sai        |
+| -h, --help     | Mostra a ajuda                                               |
 
 ## O que é limpo
 
